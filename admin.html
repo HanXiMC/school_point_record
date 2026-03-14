@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员后台 - 积分管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 10000; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .glass-modal { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 2px solid rgba(255, 255, 255, 0.9); border-radius: 28px; padding: 35px 30px; width: 90%; max-width: 360px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); transform: translateY(30px) scale(0.9); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
+        .modal-overlay.show .glass-modal { transform: translateY(0) scale(1); }
+        .glass-modal h3 { margin-top: 0; color: #333; font-size: 26px; }
+        .glass-modal input, .glass-modal select { width: 85%; padding: 14px 18px; margin: 15px 0 25px 0; border: 2px solid rgba(255,255,255,0.8); border-radius: 16px; background: rgba(255,255,255,0.6); outline: none; font-size: 18px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s; text-align: center; font-family: 'Nunito', sans-serif; }
+        .glass-modal input:focus, .glass-modal select:focus { background: rgba(255,255,255,0.95); border-color: var(--primary-color); transform: scale(1.02); }
+        .modal-btns { display: flex; gap: 15px; justify-content: center; }
+        .modal-btns button { padding: 12px 25px; border: none; border-radius: 16px; cursor: pointer; font-size: 18px; font-family: inherit; transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        .btn-cancel { background: rgba(0,0,0,0.06); color: #666; }
+        .btn-cancel:hover { transform: translateY(-4px); background: rgba(0,0,0,0.1); }
+        .btn-confirm { background: var(--primary-color); color: white; box-shadow: 0 6px 15px rgba(25, 118, 210, 0.35); }
+        .btn-confirm:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(25, 118, 210, 0.45); }
+        .backup-item { margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px; text-align: left; }
+        .backup-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .backup-actions button { padding: 6px 12px; border: none; border-radius: 16px; background: var(--glass-bg); cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 4px; }
+        .backup-actions button:hover { background: rgba(255,255,255,0.8); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="ri-settings-3-line"></i> 管理员后台</h1>
+        <button class="toggle-btn" onclick="location.href='index.html'"><i class="ri-home-line"></i> 返回首页</button>
+    </div>
+
+    <div class="modal-overlay show" id="authModal">
+        <div class="glass-modal">
+            <h3><i class="ri-lock-line"></i> 管理员验证</h3>
+            <input type="password" id="adminPwd" placeholder="请输入密码" autofocus>
+            <div class="modal-btns">
+                <button class="btn-cancel" onclick="closeAuthModal()">取消</button>
+                <button class="btn-confirm" onclick="verifyAdmin()">验证</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminContent" style="display: none; padding: 0 5%;">
+        <div class="card-container" style="grid-template-columns: repeat(auto-fit, minmax(250px,1fr));">
+            
+            <div class="card" onclick="openUndoModal()">
+                <i class="ri-arrow-go-back-line"></i> <h3>撤销分数</h3> <p>撤销某次误操作的加扣分记录</p>
+            </div>
+
+            <div class="card" onclick="resetData()">
+                <i class="ri-restart-line"></i> <h3>重置数据</h3> <p>清空所有学生明细，分数归0</p>
+            </div>
+            <div class="card" onclick="showHistory()">
+                <i class="ri-history-line"></i> <h3>历史数据</h3> <p>查看备份、下载快照或明细</p>
+            </div>
+            <div class="card" onclick="readFromFile()">
+                <i class="ri-file-copy-line"></i> <h3>读取学生名单</h3> <p>从 /data/name/ 导入姓名</p>
+            </div>
+            <div class="card" onclick="manualAdd()">
+                <i class="ri-user-add-line"></i> <h3>手动导入</h3> <p>输入姓名（逗号分隔）</p>
+            </div>
+            <div class="card" onclick="changePassword()">
+                <i class="ri-lock-password-line"></i> <h3>修改密码</h3> <p>更改管理员密码</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="historyModal">
+        <div class="glass-modal" style="max-width: 600px;">
+            <h3><i class="ri-archive-line"></i> 备份列表</h3>
+            <div id="backupList" style="max-height: 400px; overflow-y: auto; margin: 15px 0;"></div>
+            <div style="text-align:center;">
+                <button class="btn-cancel" onclick="closeHistoryModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="undoModal">
+        <div class="glass-modal" style="max-width: 600px; width: 90%;">
+            <h3><i class="ri-arrow-go-back-line"></i> 撤销分数操作</h3>
+            <select id="undoStudentSelect" onchange="loadUndoDetails()">
+                <option value="">-- 请先选择学生 --</option>
+            </select>
+            
+            <div id="undoDetailsList" style="max-height: 350px; overflow-y: auto; margin: 15px 0; text-align: left; background: rgba(255,255,255,0.4); border-radius: 12px; padding: 10px;">
+                <p style="text-align:center; color:#666;">请选择学生以查看记录</p>
+            </div>
+            
+            <div class="modal-btns">
+                <button class="btn-cancel" onclick="closeUndoModal()">关闭页面</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function closeAuthModal() { document.getElementById('authModal').classList.remove('show'); }
+
+        async function verifyAdmin() {
+            const pwd = document.getElementById('adminPwd').value;
+            if (!pwd) { alert('请输入密码'); return; }
+            try {
+                const res = await fetch('api/verify_admin.php', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: pwd})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('authModal').classList.remove('show');
+                    document.getElementById('adminContent').style.display = 'block';
+                } else {
+                    alert('密码错误'); document.getElementById('adminPwd').value = ''; document.getElementById('adminPwd').focus();
+                }
+            } catch (e) { alert('网络错误，请稍后重试'); }
+        }
+
+        function resetData() {
+            if (!confirm('确定重置所有学生明细？系统会自动备份当前数据。')) return;
+            fetch('api/reset.php?token=mfuckyou').then(res => res.text()).then(msg => alert(msg)).catch(() => alert('请求失败，请检查网络'));
+        }
+
+        async function showHistory() {
+            try {
+                const res = await fetch('api/history.php?action=list');
+                const backups = await res.json();
+                const listDiv = document.getElementById('backupList');
+                if (backups.length === 0) {
+                    listDiv.innerHTML = '<p style="text-align:center; color:#666;">暂无备份数据</p>';
+                } else {
+                    listDiv.innerHTML = backups.map(b => `
+                        <div class="backup-item">
+                            <strong>${b.name}</strong> (${new Date(b.time*1000).toLocaleString()})
+                            <div class="backup-actions">
+                                <button onclick="viewBackup('${b.name}')"><i class="ri-eye-line"></i> 查看快照</button>
+                                <button onclick="downloadBackup('${b.name}', 'zip')"><i class="ri-file-zip-line"></i> 下载ZIP</button>
+                                <button onclick="downloadBackup('${b.name}', 'excel')"><i class="ri-file-excel-line"></i> 下载Excel</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                document.getElementById('historyModal').classList.add('show');
+            } catch (e) { alert('获取备份列表失败'); }
+        }
+
+        function viewBackup(name) { window.open('snapshot.html?backup=' + encodeURIComponent(name), '_blank'); }
+        function downloadBackup(name, format) { window.location.href = 'api/history.php?action=download&backup=' + encodeURIComponent(name) + '&format=' + format; }
+        function closeHistoryModal() { document.getElementById('historyModal').classList.remove('show'); }
+        async function openUndoModal() {
+            document.getElementById('undoModal').classList.add('show');
+            try {
+                const res = await fetch('api/dashboard.php');
+                const students = await res.json();
+                const select = document.getElementById('undoStudentSelect');
+                select.innerHTML = '<option value="">-- 请先选择学生 --</option>';
+                students.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.uid;
+                    opt.textContent = `${s.name} (当前总分: ${s.score})`;
+                    select.appendChild(opt);
+                });
+                document.getElementById('undoDetailsList').innerHTML = '<p style="text-align:center;color:#666;">请选择学生以查看记录</p>';
+            } catch (e) {
+                alert('获取学生列表失败，请检查网络');
+            }
+        }
+
+        function closeUndoModal() { document.getElementById('undoModal').classList.remove('show'); }
+
+        async function loadUndoDetails() {
+            const uid = document.getElementById('undoStudentSelect').value;
+            const list = document.getElementById('undoDetailsList');
+            if (!uid) {
+                list.innerHTML = '<p style="text-align:center;color:#666;">请选择学生以查看记录</p>';
+                return;
+            }
+            list.innerHTML = '<p style="text-align:center;color:#666;"><i class="ri-loader-4-line ri-spin"></i> 数据加载中...</p>';
+            try {
+                const res = await fetch(`api/get_student_detail.php?uid=${uid}`);
+                const data = await res.json();
+                
+                if (!data.details || data.details.length === 0) {
+                    list.innerHTML = '<p style="text-align:center;color:#666;">该同学暂无加扣分记录</p>';
+                    return;
+                }
+                
+                list.innerHTML = '';
+                data.details.forEach(d => {
+                    const item = document.createElement('div');
+                    item.style.cssText = "padding: 12px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center;";
+                    
+                    const pointsColor = d.points >= 0 ? '#2e7d32' : '#d32f2f';
+                    const pointsPrefix = d.points >= 0 ? '+' : '';
+                    const logIdStr = d.log_id ? `'${d.log_id}'` : `''`;
+                    
+                    item.innerHTML = `
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold; font-size: 15px; color: #333;">
+                                ${d.reason} <span style="color:${pointsColor}; margin-left:5px;">${pointsPrefix}${d.points}分</span>
+                            </div>
+                            <div style="font-size: 13px; color: #777; margin-top: 4px;">${d.time} · 操作人: ${d.operator}</div>
+                        </div>
+                        <button onclick="executeUndo('${uid}', ${logIdStr}, '${d.time}', '${d.reason}', ${d.points})" 
+                                style="background: var(--primary-color); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: 0.2s;">
+                            撤销
+                        </button>
+                    `;
+                    list.appendChild(item);
+                });
+            } catch (e) {
+                list.innerHTML = '<p style="text-align:center;color:red;">数据加载失败</p>';
+            }
+        }
+
+        async function executeUndo(uid, log_id, time, reason, points) {
+            const pointDisplay = points >= 0 ? `+${points}` : points;
+            if (!confirm(`🚨 请确认是否撤销此操作？\n\n事由：${reason}\n分数：${pointDisplay}分\n\n(撤销后学生的总分将自动回滚)`)) {
+                return;
+            }
+            
+            try {
+                const res = await fetch('api/undo_point.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ uid, log_id, time, reason, points })
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    alert('✅ ' + result.message);
+                    // 刷新当前选择框的数据
+                    const select = document.getElementById('undoStudentSelect');
+                    const selectedIndex = select.selectedIndex;
+                    
+                    // 重新加载学生列表刷新总分
+                    const resUsers = await fetch('api/dashboard.php');
+                    const students = await resUsers.json();
+                    select.innerHTML = '<option value="">-- 请先选择学生 --</option>';
+                    students.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.uid;
+                        opt.textContent = `${s.name} (当前总分: ${s.score})`;
+                        select.appendChild(opt);
+                    });
+                    
+                    select.selectedIndex = selectedIndex;
+                    loadUndoDetails();
+                } else {
+                    alert('❌ 撤销失败：' + result.message);
+                }
+            } catch (e) {
+                alert('网络错误，撤销失败');
+            }
+        }
+
+        async function readFromFile() {
+            if (!confirm('将从 /data/name/ 下的txt文件导入学生姓名，继续？')) return;
+            try {
+                const res = await fetch('api/read.php');
+                const data = await res.json();
+                alert(data.success ? '✅ ' + data.message : '❌ 导入失败：' + data.message);
+            } catch (e) { alert('❌ 网络错误，无法连接到服务器'); }
+        }
+
+        function manualAdd() {
+            const names = prompt('请输入姓名，用逗号分隔（如：张三,李四,王五）');
+            if (!names) return;
+            fetch('api/name_add.php', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({names: names}) })
+            .then(res => res.json()).then(data => alert(data.success ? '✅ ' + data.message : '❌ 导入失败：' + data.message))
+            .catch(err => alert('❌ 网络错误，无法连接到服务器'));
+        }
+
+        function changePassword() {
+            const old = prompt('请输入原密码'); if (!old) return;
+            const newPwd = prompt('请输入新密码（至少6位）'); if (!newPwd) return;
+            if (newPwd.length < 6) { alert('新密码长度不能少于6位'); return; }
+            fetch('api/change_admin_pwd.php', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({old: old, new: newPwd}) })
+            .then(res => res.json()).then(data => alert(data.success ? '✅ 密码修改成功' : '❌ 修改失败：' + data.message))
+            .catch(() => alert('网络错误'));
+        }
+
+        document.getElementById('adminPwd').addEventListener('keypress', function(e) { if (e.key === 'Enter') verifyAdmin(); });
+    </script>
+</body>
+</html>

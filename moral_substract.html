@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>积分扣分</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .keyboard { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
+        .keyboard button { 
+            padding: 8px 12px; 
+            border: none; 
+            background: var(--glass-bg); 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: 0.2s;
+            font-size: 16px;
+        }
+        .keyboard button:hover { background: rgba(255,255,255,0.8); }
+        .student-card { 
+            padding: 10px; 
+            background: rgba(255,255,255,0.5); 
+            border-radius: 8px; 
+            text-align: center; 
+            cursor: pointer; 
+            transition: 0.2s; 
+            border: 1px solid transparent;
+        }
+        .student-card.selected { 
+            background: var(--primary-color); 
+            color: white; 
+            border-color: white;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: bold; 
+            color: #333;
+        }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            border: none; 
+            border-radius: 8px; 
+            background: rgba(255,255,255,0.8); 
+            box-sizing: border-box; 
+            font-family: inherit;
+            font-size: 16px;
+        }
+        input:focus, select:focus { 
+            outline: 2px solid var(--primary-color); 
+        }
+        .student-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(100px,1fr)); 
+            gap:10px; 
+            margin-top:10px; 
+        }
+        .time-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .time-row > div:first-child {
+            flex: 1;
+        }
+        .now-btn {
+            margin-bottom: 2px;
+            height: 42px;
+            white-space: nowrap;
+        }
+        .btn-confirm {
+            width: 100%;
+            padding: 14px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="ri-indeterminate-circle-line"></i> 积分扣分</h1>
+        <button class="toggle-btn" onclick="location.href='index.html'"><i class="ri-home-line"></i> 返回首页</button>
+    </div>
+
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div class="form-group">
+            <label><i class="ri-calendar-line"></i> 时间</label>
+            <div class="time-row">
+                <div>
+                    <input type="datetime-local" id="eventTime">
+                </div>
+                <button type="button" class="toggle-btn now-btn" onclick="setCurrentTime()" title="填入当前时间">
+                    <i class="ri-time-line"></i> 现在
+                </button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label><i class="ri-user-line"></i> 被扣分人</label>
+            <div class="keyboard" id="keyboard"></div>
+            <div id="studentList" class="student-grid"></div>
+            <p>已选：<span id="selectedCount">0</span></p>
+        </div>
+
+        <!-- 扣分事由 -->
+        <div class="form-group">
+            <label><i class="ri-question-line"></i> 扣分事由</label>
+            <select id="reason">
+                <option value="考勤">考勤</option>
+                <option value="课堂">课堂</option>
+                <option value="宿舍">宿舍</option>
+                <option value="违禁品">违禁品</option>
+                <option value="作业">作业</option>
+                <option value="考试">考试</option>
+                <option value="校园活动">校园活动</option>
+                <option value="卫生（课室）">卫生（课室）</option>
+                <option value="卫生（宿舍）">卫生（宿舍）</option>
+                <option value="学习清单">学习清单</option>
+                <option value="自定义">自定义</option>
+            </select>
+            <input type="text" id="customReason" placeholder="请填写详情（必填，若选择自定义）" style="display:none; margin-top:5px;">
+            <input type="text" id="remark" placeholder="选填备注" style="margin-top:5px;">
+        </div>
+
+        <div class="form-group">
+            <label><i class="ri-number-1"></i> 扣分分值</label>
+            <input type="number" id="points" value="1" min="1" max="100">
+        </div>
+
+        <div class="form-group">
+            <label><i class="ri-user-settings-line"></i> 操作人</label>
+            <select id="operator">
+                <option value="班长">班长</option>
+                <option value="学委">学委</option>
+                <option value="纪委">纪委</option>
+                <option value="刘瑞奇">刘瑞奇</option>
+                <option value="劳委">劳委</option>
+                <option value="班主任">班主任</option>
+                <option value="文娱委员">文娱委员</option>
+                <option value="课代表">课代表</option>
+                <option value="自定义">自定义</option>
+            </select>
+            <div id="subjectSelect" style="display:none; margin-top:5px;">
+                <select id="subject">
+                    <option value="语文">语文</option>
+                    <option value="数学">数学</option>
+                    <option value="英语">英语</option>
+                    <option value="物理">物理</option>
+                    <option value="化学">化学</option>
+                    <option value="政治">政治</option>
+                    <option value="地理">地理</option>
+                </select>
+            </div>
+            <input type="text" id="customOperator" placeholder="请填写详情（必填，若选择自定义）" style="display:none; margin-top:5px;">
+        </div>
+
+        <button class="btn-confirm" onclick="submitForm('subtract')"><i class="ri-send-plane-line"></i> 提交扣分</button>
+    </div>
+
+    <script>
+        let selectedUids = []; 
+
+        // 初始化字母键盘
+        const keyboard = document.getElementById('keyboard');
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letter => {
+            const btn = document.createElement('button');
+            btn.textContent = letter;
+            btn.onclick = () => loadStudentsByInitial(letter);
+            keyboard.appendChild(btn);
+        });
+
+        // 加载学生列表
+        async function loadStudentsByInitial(initial) {
+            const res = await fetch(`api/get_students_by_initial.php?initial=${initial}`);
+            const students = await res.json();
+            const list = document.getElementById('studentList');
+            list.innerHTML = '';
+            
+            students.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'student-card';
+                const uidStr = String(s.uid);
+                if (selectedUids.includes(uidStr)) {
+                    card.classList.add('selected');
+                }
+                
+                card.textContent = s.name;
+                card.dataset.uid = uidStr; 
+                card.onclick = () => toggleSelect(card);
+                list.appendChild(card);
+            });
+        }
+
+        // 切换选中状态
+        function toggleSelect(card) {
+            const uid = String(card.dataset.uid); 
+            if (selectedUids.includes(uid)) {
+                selectedUids = selectedUids.filter(u => u !== uid);
+                card.classList.remove('selected');
+            } else {
+                selectedUids.push(uid);
+                card.classList.add('selected');
+            }
+            document.getElementById('selectedCount').innerText = selectedUids.length;
+        }
+
+        // 设置当前时间
+        function setCurrentTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('eventTime').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        // 监听下拉框变化
+        document.getElementById('reason').addEventListener('change', function() {
+            document.getElementById('customReason').style.display = this.value === '自定义' ? 'block' : 'none';
+        });
+        document.getElementById('operator').addEventListener('change', function() {
+            const isCustom = this.value === '自定义';
+            document.getElementById('customOperator').style.display = isCustom ? 'block' : 'none';
+            document.getElementById('subjectSelect').style.display = this.value === '课代表' ? 'block' : 'none';
+        });
+
+        // 提交表单
+        async function submitForm(type) {
+            const timeVal = document.getElementById('eventTime').value;
+            if (!timeVal) {
+                alert('请选择时间');
+                return;
+            }
+            if (selectedUids.length === 0) {
+                alert('请选择至少一名学生');
+                return;
+            }
+
+            const payload = {
+                time: timeVal.replace('T', ' ') + ':00', 
+                uids: selectedUids,
+                reason: document.getElementById('reason').value,
+                customReason: document.getElementById('customReason').value,
+                remark: document.getElementById('remark').value,
+                points: parseInt(document.getElementById('points').value),
+                operator: document.getElementById('operator').value,
+                customOperator: document.getElementById('customOperator').value,
+                subject: document.getElementById('subject') ? document.getElementById('subject').value : '',
+                type: type
+            };
+
+            const res = await fetch('api/point.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            alert(result.message);
+            
+            if (result.success) {
+                selectedUids = [];
+                document.querySelectorAll('.student-card.selected').forEach(c => c.classList.remove('selected'));
+                document.getElementById('selectedCount').innerText = 0;
+                document.getElementById('customReason').value = '';
+                document.getElementById('customOperator').value = '';
+                document.getElementById('remark').value = '';
+            }
+        }
+
+        // 页面初始化
+        setCurrentTime();
+
+        // 监听回车键
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
+                e.preventDefault();
+                submitForm('subtract');
+            }
+        });
+    </script>
+</body>
+</html>

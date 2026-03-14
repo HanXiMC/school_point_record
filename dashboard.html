@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘 - 积分表</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .detail-item { padding: 8px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .score { font-size: 24px; font-weight: bold; color: var(--primary-color); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="ri-dashboard-3-line"></i> 积分表 - 仪表盘</h1>
+        <button class="toggle-btn" onclick="location.href='index.html'"><i class="ri-home-line"></i> 返回首页</button>
+    </div>
+    <div class="card-container" id="studentGrid"></div>
+
+    <!-- 明细弹窗 -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="glass-modal" style="max-width: 600px;">
+            <h2 id="modalStudentName"></h2>
+            <p>当前总分：<span id="modalScore" class="score"></span></p>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex:1;">
+                    <h3><i class="ri-add-circle-line" style="color:green;"></i> 加分</h3>
+                    <div id="addDetails"></div>
+                </div>
+                <div style="flex:1;">
+                    <h3><i class="ri-indeterminate-circle-line" style="color:red;"></i> 扣分</h3>
+                    <div id="subtractDetails"></div>
+                </div>
+            </div>
+            <div style="text-align:center; margin-top:20px;">
+                <button class="btn-cancel" onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadDashboard() {
+            const res = await fetch('api/dashboard.php');
+            const students = await res.json();
+            const grid = document.getElementById('studentGrid');
+            grid.innerHTML = '';
+            students.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `<h3>${s.name}</h3><p class="score">${s.score} 分</p>`;
+                card.onclick = () => showDetail(s.uid);
+                grid.appendChild(card);
+            });
+        }
+
+        async function showDetail(uid) {
+            const res = await fetch(`api/get_student_detail.php?uid=${uid}`);
+            const data = await res.json();
+            document.getElementById('modalStudentName').innerText = data.name;
+            document.getElementById('modalScore').innerText = data.score;
+
+            const addDiv = document.getElementById('addDetails');
+            const subDiv = document.getElementById('subtractDetails');
+            addDiv.innerHTML = '';
+            subDiv.innerHTML = '';
+
+            data.details.forEach(d => {
+                const item = document.createElement('div');
+                item.className = 'detail-item';
+                item.innerHTML = `<p>${d.time} ${d.reason} ${d.points>0?'+'+d.points:d.points}分 (${d.operator}) ${d.remark ? '备注：'+d.remark : ''}</p>`;
+                if (d.points > 0) addDiv.appendChild(item);
+                else subDiv.appendChild(item);
+            });
+
+            document.getElementById('detailModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('show');
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>
